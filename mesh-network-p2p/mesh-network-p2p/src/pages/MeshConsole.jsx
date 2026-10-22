@@ -41,11 +41,29 @@ export function MeshConsole() {
   const [text, setText] = useState("");
   const [activeHop, setActiveHop] = useState(null);
   const [linkMode, setLinkMode] = useState(false);
-  const [cloudUrl, setCloudUrl] = useState(() => import.meta.env.VITE_CLOUD_URL || import.meta.env.VITE_BACKEND_URL || window.location.origin);
-  const [cloudEnabled, setCloudEnabled] = useState(false);
+  const [cloudEnabled, setCloudEnabled] = useState(() => {
+    try {
+      return typeof window !== "undefined" && window.innerWidth <= 768;
+    } catch (e) {
+      return false;
+    }
+  });
+  const [cloudUrl, setCloudUrl] = useState(() => {
+    try {
+      return (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
+    } catch (e) {
+      return "";
+    }
+  });
   const [cloudStatus, setCloudStatus] = useState({ synced: false, lastSync: null });
   const [aiVersion, setAiVersion] = useState(null);
-  const [locationEnabled, setLocationEnabled] = useState(false);
+  const [locationEnabled, setLocationEnabled] = useState(() => {
+    try {
+      return typeof window !== "undefined" && window.innerWidth <= 768;
+    } catch (e) {
+      return false;
+    }
+  });
   const [locationStatus, setLocationStatus] = useState({ status: "off" });
   const [cryptoStatus, setCryptoStatus] = useState({ secure: false, ready: false });
   const [identityCount, setIdentityCount] = useState(0);
@@ -58,6 +76,41 @@ export function MeshConsole() {
   const recordedChunksRef = useRef([]);
   const recordSecsRef = useRef(0);
   const fileInputRef = useRef(null);
+
+  // Dynamic Central Server & Battery Failover State
+  const [centralServer, setCentralServer] = useState(() => ({ id: selfId, name: name || "Host Phone", battery: 88 }));
+  const [batteryLevel, setBatteryLevel] = useState(88);
+  const [failoverBanner, setFailoverBanner] = useState(null);
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.getBattery) {
+      navigator.getBattery().then(batt => {
+        const lvl = Math.round(batt.level * 100);
+        setBatteryLevel(lvl);
+        if (meshRef.current) meshRef.current.setBatteryLevel(lvl);
+        batt.addEventListener("levelchange", () => {
+          const nextLvl = Math.round(batt.level * 100);
+          setBatteryLevel(nextLvl);
+          if (meshRef.current) meshRef.current.setBatteryLevel(nextLvl);
+        });
+      }).catch(() => {});
+    }
+  }, []);
+
+  function handleTestBatteryDrain() {
+    setBatteryLevel(8);
+    if (meshRef.current) {
+      meshRef.current.setBatteryLevel(8);
+      meshRef.current.triggerBatteryDrainFailover("Simulated battery depletion (8%) on Central Server Phone");
+    }
+  }
+
+  function handleClaimCentralServer() {
+    if (meshRef.current) {
+      meshRef.current.claimCentralServerRole();
+      setCentralServer({ id: selfId, name, battery: batteryLevel });
+    }
+  }
 
   useEffect(() => {
     let timer;
@@ -80,6 +133,21 @@ export function MeshConsole() {
     };
   }, [recording]);
 
+  // Automatically select first destination peer by default
+  useEffect(() => {
+    const peers = graph.nodes.filter(n => n.id !== selfId);
+    if (peers.length > 0) {
+      setTarget(prev => {
+        if (!prev || !peers.some(p => p.id === prev)) {
+          return peers[0].id;
+        }
+        return prev;
+      });
+    } else {
+      setTarget("");
+    }
+  }, [graph.nodes, selfId]);
+
   function handleJoin(customName) {
     const finalName = (customName || name || "").trim();
     if (!finalName) return;
@@ -89,6 +157,15 @@ export function MeshConsole() {
       sessionStorage.setItem("mesh_node_name", finalName);
       sessionStorage.setItem("mesh_joined", "true");
     } catch (e) {}
+    if (typeof window !== "undefined" && window.innerWidth <= 768) {
+      setSidebarOpen(false);
+      setCloudEnabled(true);
+      setLocationEnabled(true);
+      if (meshRef.current) {
+        meshRef.current.setCloudSync(cloudUrl, true);
+        meshRef.current.setLocationSharing(true);
+      }
+    }
     setJoined(true);
   }
 
@@ -98,7 +175,7 @@ export function MeshConsole() {
     const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
     setLog(l => [
-      { id: uid(), tag: "system", text: `Node "${name.trim()}" online. P2P WebRTC mesh active.`, time: now() },
+      { id: uid(), tag: "system", text: `ZoneSync — Node "${name.trim()}" online. P2P WebRTC mesh active.`, time: now() },
       ...l
     ].slice(0, 100));
 
@@ -120,7 +197,9 @@ export function MeshConsole() {
         const lockTag = envelope.encrypted
           ? (envelope.verified ? " · 🔒 encrypted, ✓ verified" : " · 🔒 encrypted, ⚠ signature NOT verified")
           : " · 🔓 unencrypted";
-        const meta = `received from ${envelope.from}${lockTag}${loc ? ` · 📍 ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)} (±${loc.accuracy}m)` : ""}`;
+        const latencyTag = envelope.latencyMs ? ` · ⚡ ${envelope.hops || 1} hop(s), ${envelope.latencyMs}ms` : "";
+        const routeTag = envelope.route && envelope.route.length > 1 ? ` (${envelope.route.join(" → ")})` : "";
+        const meta = `received from ${envelope.from}${lockTag}${latencyTag}${routeTag}${loc ? ` · 📍 ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)} (±${loc.accuracy}m)` : ""}`;
         setLog(l => [{ id: uid(), tag: "delivered", text: `"${envelope.text}"`, meta, mapUrl: loc ? `https://www.google.com/maps?q=${loc.lat},${loc.lng}` : null, time: now() }, ...l].slice(0, 100));
 
         const senderNode = meshRef.current?.linkState.get(envelope.from) || graph.nodes.find(n => n.id === envelope.from);
@@ -138,7 +217,9 @@ export function MeshConsole() {
             encrypted: envelope.encrypted,
             verified: envelope.verified,
             timestamp: Date.now(),
-            path: envelope.path,
+            hops: envelope.hops,
+            latencyMs: envelope.latencyMs,
+            path: envelope.path || envelope.route,
           },
           ...prev
         ].slice(0, 10));
@@ -194,9 +275,19 @@ export function MeshConsole() {
       onLocationStatus: (status) => setLocationStatus(status),
       onCryptoStatus: (status) => setCryptoStatus(status),
       onIdentities: (identities) => setIdentityCount(identities.size),
+      onFailoverEvent: (event) => {
+        setCentralServer(event.newServer);
+        setFailoverBanner(event);
+      },
     });
     meshRef.current = mesh;
     mesh.register();
+    if (cloudEnabled || (typeof window !== "undefined" && window.innerWidth <= 768)) {
+      mesh.setCloudSync(cloudUrl, true);
+    }
+    if (locationEnabled || (typeof window !== "undefined" && window.innerWidth <= 768)) {
+      mesh.setLocationSharing(true);
+    }
     setOnline(true);
 
     return () => {
@@ -207,9 +298,12 @@ export function MeshConsole() {
 
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try {
+      if (typeof window !== "undefined" && window.innerWidth <= 768) {
+        return false;
+      }
       return localStorage.getItem("mesh_sidebar_open") !== "false";
     } catch (e) {
-      return true;
+      return typeof window !== "undefined" && window.innerWidth > 768;
     }
   });
 
@@ -563,13 +657,109 @@ export function MeshConsole() {
     }
   }
 
+  function handleAddDemoPeers() {
+    if (!meshRef.current) return;
+    const alphaId = "demo-rescue-alpha";
+    const bravoId = "demo-medic-bravo";
+
+    meshRef.current.linkState.set(alphaId, {
+      name: "Rescue-Alpha (Field Unit)",
+      neighbors: [{ id: selfId, rtt: 38 }, { id: bravoId, rtt: 52 }],
+      seq: 1
+    });
+    meshRef.current.linkState.set(bravoId, {
+      name: "Medic-Bravo (Hospital Relay)",
+      neighbors: [{ id: alphaId, rtt: 52 }, { id: selfId, rtt: 95 }],
+      seq: 1
+    });
+
+    const myEntry = meshRef.current.linkState.get(selfId) || { name, neighbors: [], seq: 0 };
+    myEntry.neighbors = [
+      ...myEntry.neighbors.filter(n => n.id !== alphaId && n.id !== bravoId),
+      { id: alphaId, rtt: 38 },
+      { id: bravoId, rtt: 95 }
+    ];
+    meshRef.current.linkState.set(selfId, myEntry);
+
+    const newGraph = meshRef.current._deriveGraph();
+    setGraph(newGraph);
+    setTarget(alphaId);
+
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLog(l => [
+      {
+        id: uid(),
+        tag: "system",
+        text: `⚡ Demo peers "Rescue-Alpha" & "Medic-Bravo" connected. P2P multi-hop ready!`,
+        time: nowStr
+      },
+      ...l
+    ].slice(0, 100));
+  }
+
+  async function handleRun5HopTest() {
+    if (!meshRef.current) return;
+    const result = await meshRef.current.runFastForwardingChainDemo();
+    if (result) {
+      setPopups(prev => [
+        {
+          id: uid(),
+          from: "Node-A",
+          fromName: "Node-A (Source)",
+          urgency: { level: "critical", score: 10 },
+          text: `⚡ Fast Packet Forwarding: Route: ${result.route.join(" → ")} (${result.hops} hops, ${result.latencyMs}ms)`,
+          encrypted: true,
+          verified: true,
+          timestamp: Date.now(),
+          hops: result.hops,
+          latencyMs: result.latencyMs,
+          path: result.route,
+        },
+        ...prev
+      ].slice(0, 10));
+    }
+  }
+
   function send() {
     if (!text.trim() || !target || !meshRef.current) return;
     const msgText = text.trim();
     const targetNode = graph.nodes.find(n => n.id === target);
     const targetName = targetNode ? targetNode.name : target;
-    meshRef.current.sendMessage(target, msgText);
     const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    if (target.startsWith("demo-")) {
+      setActiveHop({ from: selfId, to: target, urgency: urgencyPreview || "normal", progress: 0 });
+      let p = 0;
+      const hopTimer = setInterval(() => {
+        p += 0.25;
+        if (p >= 1) {
+          clearInterval(hopTimer);
+          setActiveHop(null);
+          setTimeout(() => {
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            setLog(l => [{
+              id: uid(),
+              tag: "delivered",
+              text: `Acknowledged from ${targetName}: "Received encrypted message: '${msgText}'. Routing nominal."`,
+              time: timeStr
+            }, ...l].slice(0, 100));
+            setPopups(prev => [{
+              id: uid(),
+              from: target,
+              fromName: targetName,
+              urgency: urgencyPreview || "normal",
+              text: `ACK: "${msgText}" received via multi-hop P2P mesh`,
+              timestamp: Date.now()
+            }, ...prev].slice(0, 10));
+          }, 600);
+        } else {
+          setActiveHop({ from: selfId, to: target, urgency: urgencyPreview || "normal", progress: p });
+        }
+      }, 70);
+    } else {
+      meshRef.current.sendMessage(target, msgText);
+    }
+
     setLog(l => [{
       id: uid(),
       tag: "system",
@@ -695,6 +885,10 @@ export function MeshConsole() {
           onLeaveMesh={leaveMesh}
           onChangeName={handleChangeName}
           onManualConnect={handleManualConnect}
+          centralServer={centralServer}
+          batteryLevel={batteryLevel}
+          onTestBatteryDrain={handleTestBatteryDrain}
+          onClaimCentralServer={handleClaimCentralServer}
           onClose={() => setSidebarOpen(false)}
         />
       )}
@@ -725,6 +919,14 @@ export function MeshConsole() {
               <span className="live-dot pulse" style={{ background: "#4B9EFF", boxShadow: "0 0 8px #4B9EFF" }}></span>
               <span><strong>{peerStates.filter(p => p.state === "connected").length}</strong> Links</span>
             </div>
+            <div className="stage-pill" style={{ borderColor: batteryLevel <= 20 ? "#FF3D5A" : "rgba(0, 229, 255, 0.4)" }} title={`Active Central Server: ${centralServer?.name || "This Phone"}`}>
+              <span style={{ fontSize: 11 }}>👑</span>
+              <span>Central: <strong>{centralServer?.name ? centralServer.name.split(" ")[0] : "Host"}</strong></span>
+              <span style={{ color: batteryLevel <= 20 ? "#FF3D5A" : "var(--signal)", fontWeight: 700, marginLeft: 4 }}>
+                🔋{batteryLevel}%
+              </span>
+            </div>
+
             <div className="stage-pill">
               <span style={{ fontSize: 12 }}>🔒</span>
               <span>E2E: <strong>{cryptoStatus.ready ? "Active" : "Offline"}</strong></span>
@@ -732,16 +934,52 @@ export function MeshConsole() {
           </div>
 
           <div className="stage-actions">
+            <button
+              className="stage-action-btn"
+              style={{
+                borderColor: batteryLevel <= 20 ? "#FF3D5A" : "rgba(255, 171, 64, 0.5)",
+                color: batteryLevel <= 20 ? "#FF3D5A" : "#FFAB40",
+                fontWeight: 700,
+                background: batteryLevel <= 20 ? "rgba(255, 61, 90, 0.15)" : "rgba(255, 171, 64, 0.1)"
+              }}
+              onClick={handleTestBatteryDrain}
+              title="Simulate battery depletion to 8% to test automatic failover and redirection to another phone"
+            >
+              🔋 Drain (Failover)
+            </button>
+            <button className="stage-action-btn primary-glow" onClick={handleAddDemoPeers} title="Add virtual Rescue-Alpha and Medic-Bravo peers for testing">
+              ⚡ Demo Peers
+            </button>
+            <button
+              className="stage-action-btn primary-glow"
+              onClick={handleRun5HopTest}
+              style={{ borderColor: "rgba(0, 229, 255, 0.6)", color: "var(--signal)", background: "rgba(0, 229, 255, 0.12)" }}
+              title="Execute 5-node A→B→C→D→E fast packet forwarding test with intermediate lightweight routers"
+            >
+              🚀 5-Hop Test (A→E)
+            </button>
             <button className="stage-action-btn" onClick={() => setLinkMode(m => !m)}>
-              {linkMode ? "✓ Done Links" : "⚡ Manage Direct Links"}
+              {linkMode ? "✓ Done Links" : "⚡ Links"}
             </button>
             {online ? (
-              <button className="stage-action-btn danger" onClick={goOffline}>⚠ Simulate Failure</button>
+              <button className="stage-action-btn danger" onClick={goOffline}>⚠ Failure</button>
             ) : (
               <button className="stage-action-btn success" onClick={goOnline}>↻ Reconnect</button>
             )}
           </div>
         </div>
+
+        {failoverBanner && (
+          <div className="server-failover-hud-banner">
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span className="live-dot pulse" style={{ background: "#FFAB40", boxShadow: "0 0 10px #FFAB40" }}></span>
+              <div style={{ fontSize: 12.5, lineHeight: 1.4 }}>
+                <strong style={{ color: "#FFAB40" }}>⚡ CENTRAL SERVER FAILOVER:</strong> {failoverBanner.reason}. Authority automatically redirected from <em>"{failoverBanner.oldServer?.name}"</em> to <strong>"{failoverBanner.newServer?.name}"</strong>!
+              </div>
+            </div>
+            <button className="failover-dismiss-btn" onClick={() => setFailoverBanner(null)}>✕</button>
+          </div>
+        )}
 
         <div className="hint" style={{ fontSize: 13.5, padding: "8px 14px" }}>
           {linkMode
@@ -757,9 +995,9 @@ export function MeshConsole() {
           linkMode={linkMode}
         />
         <div className="legend" style={{ fontSize: 12.5, gap: 14 }}>
-          <span><i style={{ background: "#33D6A6", boxShadow: "0 0 6px rgba(51,214,166,0.5)" }}></i>normal</span>
-          <span><i style={{ background: "#F0A63C", boxShadow: "0 0 6px rgba(240,166,60,0.5)" }}></i>elevated</span>
-          <span><i style={{ background: "#FF4B5C", boxShadow: "0 0 6px rgba(255,75,92,0.5)" }}></i>critical</span>
+          <span><i style={{ background: "#00E5FF", boxShadow: "0 0 6px rgba(0,229,255,0.5)" }}></i>normal</span>
+          <span><i style={{ background: "#FFAB40", boxShadow: "0 0 6px rgba(255,171,64,0.5)" }}></i>elevated</span>
+          <span><i style={{ background: "#FF3D5A", boxShadow: "0 0 6px rgba(255,61,90,0.5)" }}></i>critical</span>
         </div>
       </div>
       <Composer
@@ -789,6 +1027,7 @@ export function MeshConsole() {
         fileInputRef={fileInputRef}
         handleImageFile={handleImageFile}
         onToggleSidebar={toggleSidebar}
+        onAddDemoPeers={handleAddDemoPeers}
       />
     </div>
   );

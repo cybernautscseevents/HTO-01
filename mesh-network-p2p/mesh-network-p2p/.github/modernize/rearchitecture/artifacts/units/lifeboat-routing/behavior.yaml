@@ -1,0 +1,26 @@
+unit: lifeboat-routing
+side_effects:
+  - source_loc: src/components/LifeboatPanel.jsx:37
+    effect: "Posts heartbeat sensor/message data to calculate and enqueue a rescue assessment."
+    must_preserve: true
+  - source_loc: api-server.js:126
+    effect: "Dequeues messages and records dispatch alerts."
+    must_preserve: true
+branches:
+  - source_loc: lethality-calculator.js:92
+    condition: "Sensor thresholds or risk keywords match"
+    behavior: "Adds weighted factors, clamps score to 0-100, and maps to four priority tiers."
+    must_preserve: true
+error_paths:
+  - source_loc: api-server.js:34
+    trigger: "Missing deviceId"
+    outcome: "Returns HTTP 400 JSON error."
+    contract: "400 {error}"
+    must_preserve: true
+concurrency:
+  model: event-loop
+  tx_boundary:
+    source_loc: priority-queue.js:88
+    scope: "Enqueue/dequeue and metric updates are synchronous in-memory operations."
+    isolation: "none"
+    must_preserve: true

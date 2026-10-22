@@ -1,5 +1,7 @@
-# 🌐 MeshGrid P2P & Disaster Rescue Suite (v3.0)
+# 🌐 ZoneSync P2P & Disaster Rescue Suite (v3.0)
 > **Serverless-Resilient P2P Mesh Network with On-Device AI, End-to-End Encryption, Acoustic Indoor Positioning (EchoLocate), Passive Victim Detection (PulseSeeker), and Lifeboat Priority Routing.**
+
+> **Demo status:** The frontend remains buildable, while selected backend paths intentionally contain glitches for broken-demo behavior. See the repository README for the affected integrations and restoration notes.
 
 ---
 
@@ -21,8 +23,8 @@ In disasters such as earthquakes, building collapses, floods, and severe grid fa
 1. **Infrastructure Blackout**: Cell towers lose power, fiber backbones sever, and internet access disappears.
 2. **Victim Silence**: Trapped, pinned, or unconscious victims cannot press SOS buttons, unlock phones, or speak.
 
-### What MeshGrid Does
-MeshGrid transforms standard smartphones, tablets, and laptops into a **self-healing, zero-install, decentralized rescue mesh**.
+### What ZoneSync Does
+ZoneSync transforms standard smartphones, tablets, and laptops into a **self-healing, zero-install, decentralized rescue mesh**.
 - Devices discover each other locally and form **serverless WebRTC data channels**.
 - Messages, voice notes, photos, and GPS coordinates route **hop-by-hop** across devices without requiring internet or cellular service.
 - If the signaling server dies after initial handshake, the **P2P mesh continues operating independently**.
@@ -89,7 +91,7 @@ MeshGrid transforms standard smartphones, tablets, and laptops into a **self-hea
 
 ```
                    +---------------------------------------+
-                   |       MeshGrid Node (Browser)         |
+                   |       ZoneSync Node (Browser)         |
                    |                                       |
                    |  +---------------------------------+  |
                    |  |      UI / Composer / Canvas     |  |
@@ -250,6 +252,6 @@ npm run build
 ## 💡 8. Limitations & Production Roadmap
 
 - **Acoustic Attenuation**: High-frequency acoustic chirps (17–19 kHz) attenuate through thick concrete walls. EchoLocate exposes configurable frequency ranges (e.g. 15–18 kHz) for real-device hardware tuning.
-- **Mobile HTTPS Sandbox**: Mobile browsers require HTTPS for microphone and motion sensors. MeshGrid includes built-in SSL support (`@vitejs/plugin-basic-ssl`) for seamless local Wi-Fi testing.
+- **Mobile HTTPS Sandbox**: Mobile browsers require HTTPS for microphone and motion sensors. ZoneSync includes built-in SSL support (`@vitejs/plugin-basic-ssl`) for seamless local Wi-Fi testing.
 - **Time-Division Interval**: Acoustic positioning uses discrete 15-second time-division rounds to avoid clock sync issues without requiring GPS time servers.
 - **PKI Fingerprint Roadmap**: Session keypairs are generated per browser session. Production deployments can pre-provision device fingerprints via QR-code pairing prior to field operations.

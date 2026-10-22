@@ -1,0 +1,31 @@
+modules:
+  - name: browser-session-identity
+    kind: store
+    source_loc: "src/pages/MeshConsole.jsx:21"
+    used_by_units: [mesh-console, echolocate-radar, pulseseeker-detection, lifeboat-routing]
+    fields:
+      - name: mesh_node_name
+        type: "string in localStorage/sessionStorage"
+      - name: mesh_joined
+        type: "boolean string in sessionStorage"
+    god_class: false
+    split_candidate: false
+    migration_strategy: wrap
+    notes: "Shared join gate and display-name persistence."
+  - name: lifeboat-domain
+    kind: utility
+    source_loc: "lethality-calculator.js:72"
+    used_by_units: [global-backend]
+    fields:
+      - name: calculate
+        type: "function"
+      - name: enqueue
+        type: "function"
+      - name: dequeue
+        type: "function"
+      - name: getStats
+        type: "function"
+    god_class: false
+    split_candidate: false
+    migration_strategy: wrap
+    notes: "Backend scoring and queue domain used by combined and standalone API servers."

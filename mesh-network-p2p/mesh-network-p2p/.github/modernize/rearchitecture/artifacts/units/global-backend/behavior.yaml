@@ -1,0 +1,36 @@
+unit: global-backend
+side_effects:
+  - source_loc: signaling-server.js:255
+    effect: "Registers Socket.IO peers, relays WebRTC signaling packets, and broadcasts peer/failover events."
+    must_preserve: true
+  - source_loc: cloud-server.js:82
+    effect: "Stores telemetry/model state in memory and broadcasts update/model_updated events."
+    must_preserve: true
+  - source_loc: echolocate-server.js:182
+    effect: "Schedules pinger turns, accepts measurements, and publishes calculated positions."
+    must_preserve: true
+  - source_loc: api-server.js:31
+    effect: "Calculates Lifeboat assessments, enqueues entries, and dispatches alerts."
+    must_preserve: true
+branches:
+  - source_loc: priority-queue.js:151
+    condition: "Queue capacity exceeds maxSize"
+    behavior: "Evicts oldest low, normal, then elevated entries; critical entries are retained."
+    must_preserve: true
+  - source_loc: echolocate-server.js:212
+    condition: "Pinger turn times out"
+    behavior: "Advances to the next pinger without blocking the round."
+    must_preserve: true
+error_paths:
+  - source_loc: api-server.js:34
+    trigger: "Missing deviceId or calculation failure"
+    outcome: "Returns JSON HTTP 400 or 500 error."
+    contract: "REST error response"
+    must_preserve: true
+concurrency:
+  model: event-loop
+  tx_boundary:
+    source_loc: priority-queue.js:49
+    scope: "All state is process-local and mutated by synchronous handlers/timers on the Node event loop."
+    isolation: "none"
+    must_preserve: true

@@ -1,0 +1,7 @@
+unit: lifeboat-routing
+commit: false
+candidate_splits:
+  - id: lethality-calculator.js:72-321
+    drivers: [concern_split, data_ownership_split]
+    rationale: "Scoring rules and queue/dispatch orchestration are distinct responsibilities connected by the heartbeat contract."
+    source_slice: {file: lethality-calculator.js, lines: [72, 321]}

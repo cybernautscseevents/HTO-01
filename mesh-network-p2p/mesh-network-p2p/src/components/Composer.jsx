@@ -27,9 +27,10 @@ export function Composer({
   fileInputRef,
   handleImageFile,
   onToggleSidebar,
+  onAddDemoPeers,
 }) {
   const [showLog, setShowLog] = useState(false);
-  const [showDevices, setShowDevices] = useState(true);
+  const [showDevices, setShowDevices] = useState(false);
 
   function handleQuickPanic() {
     setText("CRITICAL EMERGENCY: Trapped under rubble, bleeding heavily, need immediate rescue");
@@ -153,17 +154,57 @@ export function Composer({
         <div className="composer-header">
           <div className="section-label" style={{ padding: 0 }}>📡 Send Encrypted Message</div>
           <button className="panic-preset-btn" onClick={handleQuickPanic}>
-            🚨 PANIC SOS PRESET
+            🚨 PANIC SOS
           </button>
         </div>
+
+        {/* Quick Destination Peer Selector Chips */}
+        {otherKnownNodes.length > 0 ? (
+          <div className="peer-chips-row">
+            <span className="peer-chips-label">TO:</span>
+            {otherKnownNodes.map(n => {
+              const isSelected = target === n.id;
+              return (
+                <button
+                  type="button"
+                  key={n.id}
+                  className={`peer-chip ${isSelected ? 'active' : ''}`}
+                  onClick={() => setTarget(n.id)}
+                >
+                  <span className="chip-dot"></span>
+                  <span>{n.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="demo-peers-helper-box">
+            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+              No other device on mesh yet.
+            </div>
+            {onAddDemoPeers && (
+              <button
+                type="button"
+                className="demo-peers-btn-inline"
+                onClick={onAddDemoPeers}
+              >
+                ⚡ Add Demo Peers (Rescue-Alpha / Medic)
+              </button>
+            )}
+          </div>
+        )}
 
         <select
           id="target-select"
           value={target}
           onChange={e => setTarget(e.target.value)}
-          style={{ fontSize: 14, padding: "10px 12px" }}
+          style={{ fontSize: 13.5, padding: "9px 12px", marginTop: 4 }}
         >
-          <option value="">Select destination peer…</option>
+          {otherKnownNodes.length === 0 ? (
+            <option value="">No peers connected yet…</option>
+          ) : (
+            !target && <option value="">Select destination peer…</option>
+          )}
           {otherKnownNodes.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
         </select>
 

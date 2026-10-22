@@ -1,0 +1,26 @@
+unit: cloud-dashboard
+side_effects:
+  - source_loc: src/pages/CloudDashboard.jsx:16
+    effect: "Subscribes to live telemetry/model Socket.IO updates."
+    must_preserve: true
+  - source_loc: src/pages/CloudDashboard.jsx:35
+    effect: "Posts urgency term updates to the model endpoint."
+    must_preserve: true
+branches:
+  - source_loc: src/pages/CloudDashboard.jsx:111
+    condition: "Node lastSync is older than the freshness window"
+    behavior: "Displays the node as stale instead of online."
+    must_preserve: true
+error_paths:
+  - source_loc: src/pages/CloudDashboard.jsx:47
+    trigger: "Model update request fails"
+    outcome: "Displays a failed deployment message."
+    contract: "User-visible error status"
+    must_preserve: true
+concurrency:
+  model: event-loop
+  tx_boundary:
+    source_loc: src/pages/CloudDashboard.jsx:11
+    scope: "Socket.IO updates and model POST response update React state."
+    isolation: "none"
+    must_preserve: true

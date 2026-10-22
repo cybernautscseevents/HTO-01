@@ -1,0 +1,29 @@
+flows:
+  - name: session-display-name
+    medium: session
+    key: mesh_node_name
+    writer:
+      unit: mesh-console
+      source_loc: src/pages/MeshConsole.jsx:156
+    reader:
+      unit: echolocate-radar
+      source_loc: src/pages/EchoLocateView.jsx:10
+    pairing: matched
+    must_preserve: true
+    must_confirm: null
+    verification_hint: "Join once, navigate between routes, and verify the same display name is reused."
+    notes: "The same persisted name gates all operational pages."
+  - name: telemetry-to-dashboard
+    medium: database
+    key: nodeId
+    writer:
+      unit: mesh-console
+      source_loc: src/services/meshNode.js:239
+    reader:
+      unit: cloud-dashboard
+      source_loc: src/pages/CloudDashboard.jsx:16
+    pairing: external-writer
+    must_preserve: true
+    must_confirm: runtime
+    verification_hint: "Enable cloud sync and verify the node appears in the dashboard with updated statistics."
+    notes: "The effective medium is HTTP POST plus Socket.IO broadcast backed by process memory."

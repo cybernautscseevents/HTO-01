@@ -5,9 +5,9 @@ const OPERATIONAL_MODES = [
   {
     id: "mesh",
     path: "/",
-    name: "P2P Mesh Network Console",
+    name: "ZoneSync — P2P Mesh Console",
     icon: "🌐",
-    tag: "WEBRTC · SOS ROUTING",
+    tag: "WEBRTC · AI PRIORITY ENGINE",
     desc: "Hop-by-hop serverless WebRTC data channels, Dijkstra congestion rerouting, on-device AI triage, and encrypted text/voice/media dispatch.",
     pill: "Hop-by-Hop · E2EE · Zero-Cloud",
     color: "#33D6A6",
@@ -16,10 +16,10 @@ const OPERATIONAL_MODES = [
   {
     id: "echolocate",
     path: "/echolocate",
-    name: "EchoLocate Indoor Radar",
+    name: "EchoLocate — Acoustic Indoor Radar",
     icon: "📡",
     tag: "ACOUSTIC RTT · 2D RADAR",
-    desc: "Non-GPS acoustic Time-of-Flight ranging and 2D least-squares multilateration to pinpoint trapped survivors indoors.",
+    desc: "Non-GPS acoustic Time-of-Flight ranging and 2D least-squares multilateration to pinpoint targets indoors without GPS infrastructure.",
     pill: "LFM Chirps · 2D Multilateration · Non-GPS",
     color: "#4B9EFF",
     bgGradient: "linear-gradient(135deg, rgba(75, 158, 255, 0.2), rgba(20, 50, 90, 0.4))",
@@ -27,11 +27,11 @@ const OPERATIONAL_MODES = [
   {
     id: "pulseseeker",
     path: "/pulseseeker",
-    name: "PulseSeeker Victim Detection",
-    icon: "🆘",
-    tag: "TINYML · RUBBLE TAPPING",
-    desc: "100% offline acoustic rhythm & accelerometer sensor analysis to detect rubble tapping (3.2 Hz) and auto-dispatch emergency survivor beacons.",
-    pill: "TinyML MFCC · Accelerometer · Auto-SOS",
+    name: "PulseSeeker — Motion Detection",
+    icon: "🔬",
+    tag: "TINYML · INERTIA ANALYSIS",
+    desc: "100% offline acoustic rhythm & accelerometer sensor analysis. Detects tapping (3.2 Hz) and prolonged stillness — auto-dispatches emergency coordinates with critical confidence.",
+    pill: "TinyML MFCC · Accelerometer · Auto-Coordinates",
     color: "#FF4B5C",
     bgGradient: "linear-gradient(135deg, rgba(255, 75, 92, 0.2), rgba(90, 20, 30, 0.4))",
   },
@@ -49,10 +49,9 @@ export function JoinModal({ name, setName, onJoin, defaultMode }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Find initial mode matching current path or default
   const initialMode = OPERATIONAL_MODES.find(m => m.path === (defaultMode || location.pathname)) || OPERATIONAL_MODES[0];
 
-  const [step, setStep] = useState("select-mode"); // "select-mode" | "join-mesh"
+  const [step, setStep] = useState("select-mode");
   const [selectedMode, setSelectedMode] = useState(initialMode);
   const [localName, setLocalName] = useState(() => name || localStorage.getItem("mesh_node_name") || "");
 
@@ -100,10 +99,37 @@ export function JoinModal({ name, setName, onJoin, defaultMode }) {
         <div className="mode-header-badge-row">
           <div className="mode-system-badge">
             <span className="live-dot pulse"></span>
-            CRISISLINK // RAPID DISASTER DEPLOYMENT v3.0
+            ZONESYNC // SMART ZONE DEPLOYMENT v3.0
           </div>
-          <div className="mode-step-indicator">
-            {step === "select-mode" ? "STEP 1 OF 2 : SELECT MODE" : "STEP 2 OF 2 : JOIN MESH"}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="mode-step-indicator">
+              {step === "select-mode" ? "STEP 1 OF 2 : SELECT MODULE" : "STEP 2 OF 2 : JOIN NETWORK"}
+            </div>
+            {Boolean(sessionStorage.getItem("mesh_joined") === "true") && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onJoin) onJoin(localName);
+                }}
+                style={{
+                  background: "rgba(255,255,255,0.08)",
+                  border: "none",
+                  color: "var(--text-secondary)",
+                  borderRadius: "50%",
+                  width: 26,
+                  height: 26,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 14,
+                  fontWeight: 700
+                }}
+                title="Close Modal"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
@@ -111,10 +137,10 @@ export function JoinModal({ name, setName, onJoin, defaultMode }) {
           /* ================= STEP 1: SELECT OPERATIONAL MODE ================= */
           <div className="mode-selector-step">
             <h2 className="mode-selector-title">
-              <span>⚡</span> Select Operational Mode
+              <span>⚡</span> Select ZoneSync Module
             </h2>
             <p className="mode-selector-subtitle">
-              Choose your role and operational subsystem to initialize peer-to-peer protocols and on-device AI:
+              Choose your module to initialize P2P protocols, AI priority engine, and on-device sensors:
             </p>
 
             <div className="modes-grid">
@@ -163,7 +189,7 @@ export function JoinModal({ name, setName, onJoin, defaultMode }) {
                         {mode.pill}
                       </span>
                       <span className="mode-card-arrow" style={{ color: mode.color }}>
-                        Select Mode →
+                        Select Module →
                       </span>
                     </div>
                   </div>
@@ -173,7 +199,7 @@ export function JoinModal({ name, setName, onJoin, defaultMode }) {
 
             <div className="join-modal-footer-features">
               <span>🔒 100% Serverless WebRTC</span>
-              <span>⚡ On-Device AI Triage</span>
+              <span>⚡ On-Device AI Priority Engine</span>
               <span>📍 Non-GPS Acoustic RTT</span>
               <span>🛡️ Zero Cloud Dependency</span>
             </div>
@@ -188,7 +214,7 @@ export function JoinModal({ name, setName, onJoin, defaultMode }) {
                 <div>
                   <div className="summary-title">{selectedMode.name}</div>
                   <span className="summary-badge" style={{ color: selectedMode.color }}>
-                    Target Mode: {selectedMode.tag}
+                    Module: {selectedMode.tag}
                   </span>
                 </div>
               </div>
@@ -197,15 +223,15 @@ export function JoinModal({ name, setName, onJoin, defaultMode }) {
                 className="btn-change-mode"
                 onClick={() => setStep("select-mode")}
               >
-                ← Change Mode
+                ← Change Module
               </button>
             </div>
 
             <h2 className="mode-selector-title" style={{ fontSize: 22 }}>
-              <span>📡</span> Identify Your Device & Join Mesh
+              <span>📡</span> Identify Your Device & Join Network
             </h2>
             <p className="mode-selector-subtitle" style={{ marginBottom: 18 }}>
-              Enter a display name so nearby peers, rescue vans, and base stations can recognize and route packets to you:
+              Enter a display name so nearby peers and base stations can route packets to you:
             </p>
 
             <form onSubmit={handleFormSubmit}>
@@ -255,7 +281,7 @@ export function JoinModal({ name, setName, onJoin, defaultMode }) {
                   style={{ padding: "14px 20px", fontSize: 13 }}
                   onClick={() => setStep("select-mode")}
                 >
-                  ← Back to Modes
+                  ← Back to Modules
                 </button>
                 <button
                   id="submit-join-mesh-btn"
@@ -266,7 +292,7 @@ export function JoinModal({ name, setName, onJoin, defaultMode }) {
                     background: canJoin ? selectedMode.color : undefined,
                   }}
                 >
-                  <span>🚀 Join Mesh & Launch {selectedMode.name}</span>
+                  <span>🚀 Join Network & Launch {selectedMode.name}</span>
                   <span>→</span>
                 </button>
               </div>

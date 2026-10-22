@@ -1,0 +1,21 @@
+unit: pulseseeker-detection
+bindings:
+  - type: route-declaration
+    name: "React Router path /pulseseeker"
+    source_loc: src/App.jsx:15
+    target: PulseSeekerView
+    must_appear_in_target: true
+    notes: "Join-gated passive detection page."
+  - type: listener
+    name: "DeviceMotion and Web Audio sensor listeners"
+    source_loc: src/services/pulseSeeker.js:150
+    target: PulseSeeker
+    must_appear_in_target: true
+    notes: "Sensor permissions and event listeners drive inference."
+runtime_config:
+  - key: VITE_BACKEND_URL
+    source_loc: src/services/pulseSeeker.js:509
+    source: env
+    default_value: "same-origin"
+    must_appear_in_target: true
+    notes: "Beacon endpoint base URL."

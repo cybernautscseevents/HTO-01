@@ -26,7 +26,7 @@ export class PulseSeeker {
     this.motionHistory = [];
     this.audioBufferQueue = [];
 
-    this.beaconSent = false;
+    this.autoBeaconCooldown = false;   // cooldown for AUTOMATIC detections only
     this.confidenceHistory = [];
     this.recentBeacons = [];
 
@@ -269,34 +269,71 @@ export class PulseSeeker {
       return Math.sqrt(e / buf.length);
     });
 
-    const maxE = Math.max(...energies, 0.001);
+    const maxE = Math.max(...energies, 0.0001);
     const avgE = energies.reduce((a, b) => a + b, 0) / energies.length;
 
-    // Peak counting (taps per second)
-    let peaks = 0;
+    // ─── NOISE FLOOR GATE ───
+    // Ambient silence or mic hiss has RMS < 0.06.
+    // Real physical taps have distinct spikes with maxE >= 0.07 and maxE >= avgE * 2.2.
+    if (maxE < 0.06 || maxE < avgE * 2.0) {
+      return [0.0, 0.0, 0.0, 0.0, Math.min(1.0, maxE * 4)];
+    }
+
+    // Detect distinct peaks with prominent impulse above threshold
+    const peakIndices = [];
+    const minPeakThreshold = Math.max(0.05, avgE * 2.2);
     for (let i = 1; i < energies.length - 1; i++) {
-      if (energies[i] > avgE * 1.8 && energies[i] > energies[i - 1] && energies[i] > energies[i + 1]) {
-        peaks++;
+      if (
+        energies[i] > minPeakThreshold &&
+        energies[i] > energies[i - 1] &&
+        energies[i] > energies[i + 1]
+      ) {
+        // Enforce refractory period between taps (at least 2 buffers apart, ~80ms)
+        if (peakIndices.length === 0 || i - peakIndices[peakIndices.length - 1] >= 2) {
+          peakIndices.push(i);
+        }
       }
     }
 
-    const cadenceScore = (peaks >= 2 && peaks <= 4) ? 0.95 : (peaks > 0 ? 0.4 : 0.05);
+    const peaks = peakIndices.length;
+    let cadenceScore = 0.0;
+
+    // A real rhythmic tapping pattern in an ~0.85s window needs 2 to 4 distinct, spaced taps
+    if (peaks >= 2 && peaks <= 4) {
+      // Check inter-tap interval consistency (rhythm regularity)
+      const intervals = [];
+      for (let i = 1; i < peakIndices.length; i++) {
+        intervals.push(peakIndices[i] - peakIndices[i - 1]);
+      }
+      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      const maxDev = Math.max(...intervals.map(it => Math.abs(it - avgInterval)));
+
+      // If intervals are regular (deviating by no more than 3 buffer frames)
+      if (maxDev <= 3.5 && avgInterval >= 3) {
+        cadenceScore = 0.92;
+      } else {
+        cadenceScore = 0.35; // sporadic noise spikes, not a steady rhythm
+      }
+    }
+
     const impulseRatio = maxE / (avgE + 0.0001);
     const varE = energies.reduce((a, b) => a + Math.pow(b - avgE, 2), 0) / energies.length;
 
     return [
       Math.min(1.0, cadenceScore),
-      Math.min(1.0, impulseRatio / 5.0),
-      Math.min(1.0, varE * 100),
+      Math.min(1.0, impulseRatio / 6.0),
+      Math.min(1.0, varE * 50),
       Math.min(1.0, peaks / 4.0),
-      Math.min(1.0, maxE * 10)
+      Math.min(1.0, maxE * 5)
     ];
   }
 
   // Compute Motion & Inertia Features
   computeMotionFeatures() {
+    const timeoutSec = Math.max(60, this.options.inertiaTimeoutMs / 1000);
+    const stillnessScore = Math.min(1.0, this.stillnessDurationSec / timeoutSec);
+
     if (this.motionHistory.length === 0) {
-      const stillnessScore = Math.min(1.0, this.stillnessDurationSec / 300); // 5 mins
       return [0, 0, 0, 0, stillnessScore];
     }
 
@@ -304,7 +341,6 @@ export class PulseSeeker {
     const avgMag = mags.reduce((a, b) => a + b, 0) / mags.length;
     const varMag = mags.reduce((a, b) => a + Math.pow(b - avgMag, 2), 0) / mags.length;
 
-    const stillnessScore = Math.min(1.0, this.stillnessDurationSec / 300);
     const lastM = this.motionHistory[this.motionHistory.length - 1];
 
     return [
@@ -329,6 +365,7 @@ export class PulseSeeker {
     }
 
     // Output Layer (4 classes with Softmax)
+    // 0: tapping, 1: inertia_unconscious, 2: normal, 3: noise
     const rawOut = new Array(4).fill(0);
     for (let k = 0; k < 4; k++) {
       let sum = 0;
@@ -338,19 +375,25 @@ export class PulseSeeker {
       rawOut[k] = sum;
     }
 
-    // Heuristic boost for tapping / inertia
+    // BASELINE: "normal" environment is the expected default state (healthy bias)
+    rawOut[2] += 2.5;
+
     const rhythmCadence = features[15] || 0;
     const rhythmImpulse = features[16] || 0;
+    const rhythmMaxE = features[19] || 0;
     const stillnessScore = features[24] || 0;
 
-    // Tapping class boost if rhythmic impulse pattern detected
-    if (rhythmCadence > 0.7 && rhythmImpulse > 0.3) {
-      rawOut[0] += 2.5;
+    // Tapping class boost ONLY if BOTH high cadence regularity, high impulse ratio, AND audible acoustic energy
+    if (rhythmCadence >= 0.8 && rhythmImpulse >= 0.4 && rhythmMaxE >= 0.25) {
+      rawOut[0] += 4.0;
+      rawOut[2] -= 1.5;
     }
 
-    // Inertia / Unconscious class boost if stationary > threshold
-    if (stillnessScore > 0.8 || this.stillnessDurationSec > (this.options.inertiaTimeoutMs / 1000)) {
-      rawOut[1] += 3.0;
+    // Inertia / Unconscious class boost ONLY if stationary past full timeout duration
+    const timeoutSec = Math.max(60, this.options.inertiaTimeoutMs / 1000);
+    if (stillnessScore >= 0.98 && this.stillnessDurationSec >= timeoutSec) {
+      rawOut[1] += 4.0;
+      rawOut[2] -= 1.5;
     }
 
     // Softmax
@@ -359,27 +402,42 @@ export class PulseSeeker {
     const sumExps = exps.reduce((a, b) => a + b, 0);
     const probs = exps.map(v => v / sumExps);
 
+    let topClass = "normal";
+    if (probs[0] >= 0.7) topClass = "tapping";
+    else if (probs[1] >= 0.7) topClass = "inertia";
+
     return {
       tapping: probs[0],
       inertia: probs[1],
       normal: probs[2],
       noise: probs[3],
-      topClass: probs[0] > probs[1] ? (probs[0] > 0.5 ? "tapping" : "normal") : (probs[1] > 0.5 ? "inertia" : "normal")
+      topClass
     };
   }
 
-  // Process Prediction and Trigger Auto-Beacon if threshold exceeded
+  // Process Prediction and Trigger Auto-Beacon if threshold exceeded with debounce
   processPrediction(prediction, features) {
     const { tapping, inertia } = prediction;
 
-    // Check Tapping Pattern (> 80% confidence)
+    // Check Tapping Pattern (require sustained periodic tapping over at least 2 checks)
     if (tapping >= this.options.detectionThreshold) {
-      this.triggerDetection("tapping", tapping, features);
+      this.consecutiveTappingCount = (this.consecutiveTappingCount || 0) + 1;
+      if (this.consecutiveTappingCount >= 2) {
+        this.triggerDetection("tapping", tapping, features);
+      }
+    } else {
+      this.consecutiveTappingCount = 0;
     }
 
-    // Check Inertia / Unconsciousness (> 80% confidence or >5 minutes stillness)
-    if (inertia >= 0.80 || this.stillnessDurationSec >= (this.options.inertiaTimeoutMs / 1000)) {
-      this.triggerDetection("unconscious", Math.max(inertia, 0.92), features);
+    // Check Inertia / Unconsciousness (require verified full stillness duration)
+    const timeoutSec = Math.max(60, this.options.inertiaTimeoutMs / 1000);
+    if (inertia >= 0.85 && this.stillnessDurationSec >= timeoutSec) {
+      this.consecutiveInertiaCount = (this.consecutiveInertiaCount || 0) + 1;
+      if (this.consecutiveInertiaCount >= 2) {
+        this.triggerDetection("unconscious", Math.max(inertia, 0.92), features);
+      }
+    } else {
+      this.consecutiveInertiaCount = 0;
     }
 
     // Record confidence trend history
@@ -388,8 +446,14 @@ export class PulseSeeker {
   }
 
   // Trigger Victim Detection & Auto-Send Beacon
-  async triggerDetection(type, confidence, features) {
-    if (this.beaconSent) return;
+  // isManual=true bypasses cooldown (used by the manual test button)
+  async triggerDetection(type, confidence, features, isManual = false) {
+    // Automatic detections respect a 45s cooldown to prevent flooding.
+    // Manual button triggers always fire regardless of cooldown state.
+    if (!isManual && this.autoBeaconCooldown) {
+      console.log(`[PulseSeeker] Auto-detection (${type}) suppressed during cooldown. Use manual trigger to override.`);
+      return;
+    }
 
     const detection = {
       id: `ps-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -398,6 +462,7 @@ export class PulseSeeker {
       timestamp: Date.now(),
       location: await this.getCoordinates(),
       environment: this.classifyEnvironment(features),
+      isManualTrigger: isManual,
       deviceInfo: {
         userAgent: navigator.userAgent,
         screen: `${window.innerWidth}x${window.innerHeight}`,
@@ -415,21 +480,25 @@ export class PulseSeeker {
     // Auto-send emergency beacon through mesh network & REST API
     await this.sendAutoBeacon(detection);
 
-    // Cooldown flag to prevent beacon flooding (45s cooldown)
-    this.beaconSent = true;
-    setTimeout(() => {
-      this.beaconSent = false;
-    }, 45000);
+    // Only apply cooldown for automatic detections (not manual triggers)
+    if (!isManual) {
+      this.autoBeaconCooldown = true;
+      setTimeout(() => {
+        this.autoBeaconCooldown = false;
+        console.log('[PulseSeeker] Auto-detection cooldown cleared. Ready for next automatic alert.');
+      }, 45000);
+    }
   }
 
   // Send Auto-Beacon over Mesh Network & REST API
   async sendAutoBeacon(detection) {
-    const textMsg = `🆘 PULSESEEKER SURVIVOR ALERT: ${detection.type.toUpperCase()} detected (${detection.confidence}% confidence) in ${detection.environment} environment!`;
+    const loc = detection.location || { lat: 37.7749, lng: -122.4194 };
+    const textMsg = `🚨 INERTIASENSE CRITICAL ALERT: ${detection.type.toUpperCase()} detected (${detection.confidence}% confidence) in ${detection.environment} zone! Coordinates: ${loc.lat}, ${loc.lng} | Maps: https://www.google.com/maps?q=${loc.lat},${loc.lng}`;
 
     // 1. Broadcast via P2P Mesh Network if connected
     if (this.options.meshNode) {
       try {
-        await this.options.meshNode.broadcastLocationToAll(textMsg, detection.location);
+        await this.options.meshNode.broadcastLocationToAll(textMsg, loc);
       } catch (e) {
         console.warn("[PulseSeeker] Mesh broadcast fallback:", e.message);
       }
@@ -444,7 +513,7 @@ export class PulseSeeker {
       const res = await fetch(beaconUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(detection)
+        body: JSON.stringify({ ...detection, alertText: textMsg, coords: loc })
       });
       if (res.ok) {
         console.log(`[PulseSeeker] ✅ Auto-Beacon delivered: ${detection.type} (${detection.confidence}%)`);
@@ -512,13 +581,13 @@ export class PulseSeeker {
     return "debris-area";
   }
 
-  // Manual Trigger Simulation for testing
+  // Manual Trigger Simulation for testing — bypasses auto-cooldown
   simulateTapping() {
     const simulatedFeatures = new Array(25).fill(0.1);
     simulatedFeatures[15] = 0.95; // high cadence
     simulatedFeatures[16] = 0.85; // impulse ratio
 
-    this.triggerDetection("tapping", 0.94, simulatedFeatures);
+    this.triggerDetection("tapping", 0.94, simulatedFeatures, true); // isManual=true
   }
 
   simulateInertia() {
@@ -526,7 +595,7 @@ export class PulseSeeker {
     const simulatedFeatures = new Array(25).fill(0.02);
     simulatedFeatures[24] = 1.0; // max stillness score
 
-    this.triggerDetection("unconscious", 0.96, simulatedFeatures);
+    this.triggerDetection("unconscious", 0.96, simulatedFeatures, true); // isManual=true
   }
 
   handleError(msg) {

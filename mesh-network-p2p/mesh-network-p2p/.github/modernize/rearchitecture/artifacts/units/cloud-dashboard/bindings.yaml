@@ -1,0 +1,21 @@
+unit: cloud-dashboard
+bindings:
+  - type: route-declaration
+    name: "React Router paths /dashboard and /dashboard.html"
+    source_loc: src/App.jsx:17
+    target: CloudDashboard
+    must_appear_in_target: true
+    notes: "Remote operations dashboard aliases."
+  - type: listener
+    name: "update and model_updated Socket.IO events"
+    source_loc: src/pages/CloudDashboard.jsx:14
+    target: CloudDashboard
+    must_appear_in_target: true
+    notes: "Live cloud state and model distribution updates."
+runtime_config:
+  - key: VITE_BACKEND_URL
+    source_loc: src/pages/CloudDashboard.jsx:5
+    source: env
+    default_value: "same-origin"
+    must_appear_in_target: true
+    notes: "Cloud dashboard API/socket base URL."

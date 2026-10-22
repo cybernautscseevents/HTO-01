@@ -1,0 +1,30 @@
+unit: pulseseeker-detection
+side_effects:
+  - source_loc: src/services/pulseSeeker.js:193
+    effect: "Runs periodic audio/motion feature extraction and TinyML inference."
+    must_preserve: true
+  - source_loc: src/components/PulseSeekerPanel.jsx:31
+    effect: "Auto-shares coordinates over mesh and POSTs a survivor beacon for high-confidence detections."
+    must_preserve: true
+branches:
+  - source_loc: src/services/pulseSeeker.js:426
+    condition: "Tapping or unconsciousness confidence exceeds detection threshold"
+    behavior: "Emits a detection and may trigger automatic beacon dispatch."
+    must_preserve: true
+  - source_loc: src/services/pulseSeeker.js:598
+    condition: "Manual demo simulation requested"
+    behavior: "Creates a synthetic unconscious detection."
+    must_preserve: true
+error_paths:
+  - source_loc: src/services/pulseSeeker.js:67
+    trigger: "Microphone or motion sensor unavailable"
+    outcome: "Continues in acoustic simulation/fallback mode and reports status."
+    contract: "Status callback"
+    must_preserve: true
+concurrency:
+  model: event-loop
+  tx_boundary:
+    source_loc: src/services/pulseSeeker.js:183
+    scope: "One-second interval inference loop plus asynchronous beacon/location requests."
+    isolation: "none"
+    must_preserve: true

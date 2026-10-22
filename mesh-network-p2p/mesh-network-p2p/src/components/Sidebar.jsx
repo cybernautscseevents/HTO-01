@@ -20,10 +20,15 @@ export function Sidebar({
   onLeaveMesh,
   onChangeName,
   onManualConnect,
+  centralServer,
+  batteryLevel,
+  onTestBatteryDrain,
+  onClaimCentralServer,
   onClose,
 }) {
   const connectedCount = peerStates.filter(p => p.state === "connected").length;
   const selfNode = graph.nodes.find(n => n.id === selfId);
+  const isSelfServer = centralServer && (centralServer.id === selfId || centralServer.name === selfNode?.name);
 
   return (
     <div className="sidebar" style={{ padding: "14px", gap: "12px", display: "flex", flexDirection: "column" }}>
@@ -55,10 +60,96 @@ export function Sidebar({
         </div>
       </div>
 
+      {/* CARD: Central Server Authority & Battery Failover */}
+      <div className="sidebar-card" style={{ borderColor: isSelfServer ? "rgba(0, 229, 255, 0.35)" : "rgba(255, 171, 64, 0.3)" }}>
+        <div className="card-header-sm" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span className="card-title-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 13 }}>👑</span> Central Server Authority
+          </span>
+          <span style={{
+            fontSize: 10,
+            fontWeight: 800,
+            padding: "2px 6px",
+            borderRadius: 4,
+            background: isSelfServer ? "rgba(0, 229, 255, 0.15)" : "rgba(255, 171, 64, 0.15)",
+            color: isSelfServer ? "var(--signal)" : "#FFAB40",
+            border: `1px solid ${isSelfServer ? "rgba(0, 229, 255, 0.3)" : "rgba(255, 171, 64, 0.3)"}`
+          }}>
+            {isSelfServer ? "ACTIVE HUB" : "CLIENT RELAY"}
+          </span>
+        </div>
+
+        <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 6, background: "rgba(0, 0, 0, 0.35)", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 11.5, color: "var(--text-dim)" }}>Current Server:</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>
+              {isSelfServer ? `${selfNode?.name || "This Phone"} (You)` : (centralServer?.name || "Network Coordinator")}
+            </span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+            <span style={{ fontSize: 11.5, color: "var(--text-dim)" }}>Battery Status:</span>
+            <span style={{
+              fontSize: 12,
+              fontWeight: 800,
+              color: (isSelfServer ? batteryLevel : (centralServer?.battery || 85)) <= 20 ? "#FF3D5A" : "var(--signal)"
+            }}>
+              🔋 {isSelfServer ? batteryLevel : (centralServer?.battery || 85)}%
+              {(isSelfServer ? batteryLevel : (centralServer?.battery || 85)) <= 20 ? " ⚠ LOW" : " ✓ OK"}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 10.5, color: "var(--text-dim)", marginTop: 6, lineHeight: 1.4 }}>
+          {isSelfServer
+            ? "🛡️ If battery drops ≤ 15% or phone dies, server role automatically transfers to another phone peer."
+            : "⚡ Connected to mesh central server. Auto-failover engages if host phone battery dies."}
+        </div>
+
+        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+          {isSelfServer ? (
+            <button
+              onClick={onTestBatteryDrain}
+              style={{
+                flex: 1,
+                padding: "7px 8px",
+                fontSize: 11,
+                fontWeight: 700,
+                borderRadius: 6,
+                background: "rgba(255, 61, 90, 0.15)",
+                border: "1px solid rgba(255, 61, 90, 0.4)",
+                color: "#FF3D5A",
+                cursor: "pointer"
+              }}
+              title="Drain simulated battery to 8% to test automatic redirect/failover to another phone"
+            >
+              🔋 Drain Battery (Test Failover)
+            </button>
+          ) : (
+            <button
+              onClick={onClaimCentralServer}
+              style={{
+                flex: 1,
+                padding: "7px 8px",
+                fontSize: 11,
+                fontWeight: 700,
+                borderRadius: 6,
+                background: "rgba(0, 229, 255, 0.15)",
+                border: "1px solid rgba(0, 229, 255, 0.4)",
+                color: "var(--signal)",
+                cursor: "pointer"
+              }}
+              title="Promote this phone to become the active Central Server"
+            >
+              👑 Claim Central Server Role
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* CARD 2: Known Mesh Nodes Manager */}
       <div className="sidebar-card">
         <div className="card-header-sm" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span className="card-title-sm">🌐 Known Mesh Nodes ({graph.nodes.length})</span>
+          <span className="card-title-sm">🌐 Connected Devices ({graph.nodes.length})</span>
           {onManualConnect && (
             <button
               onClick={onManualConnect}
@@ -187,7 +278,7 @@ export function Sidebar({
       <div style={{ marginTop: "auto", paddingTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
         {onLeaveMesh && (
           <button className="btn-offline" onClick={onLeaveMesh} style={{ fontSize: 12.5, padding: "8px", fontWeight: 700, background: "rgba(240,166,60,0.12)", color: "#f5b963", borderColor: "rgba(240,166,60,0.3)" }}>
-            🚪 Leave Mesh (Re-enter Name)
+            🚪 Leave ZoneSync Network
           </button>
         )}
         {online

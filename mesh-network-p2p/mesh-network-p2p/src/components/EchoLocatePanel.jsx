@@ -482,7 +482,7 @@ export function EchoLocatePanel({ socket, selfId, selfName }) {
             ↻ Run 3D Round
           </button>
 
-          <button className="secondary-btn" style={{ borderColor: "#33D6A6", color: "#33D6A6", fontWeight: 700 }} onClick={handleSimulateDemo3D}>
+          <button className="secondary-btn" style={{ borderColor: "var(--signal)", color: "var(--signal)", fontWeight: 700 }} onClick={handleSimulateDemo3D}>
             ⚡ Simulate 3D Multi-Floor Plot
           </button>
         </div>

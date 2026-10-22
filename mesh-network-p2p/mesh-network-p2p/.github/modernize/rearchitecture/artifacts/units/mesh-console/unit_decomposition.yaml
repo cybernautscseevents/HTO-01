@@ -1,0 +1,7 @@
+unit: mesh-console
+commit: false
+candidate_splits:
+  - id: src/pages/MeshConsole.jsx:17-962
+    drivers: [concern_split, execution_model_split]
+    rationale: "The route component coordinates join state, mesh lifecycle, media capture, location, cloud sync, failover, and several independent UI panels."
+    source_slice: {file: src/pages/MeshConsole.jsx, lines: [17, 962]}

@@ -93,7 +93,9 @@ app.post("/api/auto-beacon", (req, res) => {
   console.log(`[PulseSeeker] 🆘 Emergency Survivor Beacon Received: ${beacon.type || 'unknown'} (${beacon.confidence || 0}% confidence)`);
 
   // Broadcast survivor alert to all connected sockets
-  io.emit("pulseseeker:beacon_received", beaconEntry);
+  // Intentional broken-demo glitch: the event name has a typo, so connected
+  // clients do not receive the survivor beacon notification reliably.
+  io.emit("pulseseeker:beacon_recieved", beaconEntry);
   res.json({ success: true, beaconId: beaconEntry.beaconId, timestamp: beaconEntry.receivedAt });
 });
 
@@ -235,7 +237,7 @@ app.use((req, res) => {
   if (fs.existsSync(publicIndex)) {
     return res.sendFile(publicIndex);
   }
-  res.send("CrisisLink / MeshGrid Backend Server Running");
+  res.send("CrisisLink / ZoneSync Backend Server Running");
 });
 
 const server = http.createServer(app);
@@ -274,6 +276,10 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("server_failover", (failoverMsg) => {
+    io.emit("central_server_redirected", failoverMsg);
+  });
+
   socket.on("disconnect", () => {
     const id = socket.data.nodeId;
     if (id) {
@@ -285,6 +291,5 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 4001;
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`CrisisLink Unified Server running on http://0.0.0.0:${PORT}`);
+  console.log(`ZoneSync Unified Server running on http://0.0.0.0:${PORT}`);
 });
-

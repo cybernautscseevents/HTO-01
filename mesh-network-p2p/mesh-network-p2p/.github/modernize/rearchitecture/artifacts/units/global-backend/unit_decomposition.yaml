@@ -1,0 +1,11 @@
+unit: global-backend
+commit: false
+candidate_splits:
+  - id: signaling-server.js:1-295
+    drivers: [protocol_split, concern_split]
+    rationale: "The combined production server hosts signaling, beacon ingestion, Lifeboat APIs, cloud sync, and model operations that also exist as separable services."
+    source_slice: {file: signaling-server.js, lines: [1, 295]}
+  - id: echolocate-server.js:1-378
+    drivers: [execution_model_split, concern_split]
+    rationale: "EchoLocate combines Socket.IO round orchestration, acoustic measurement handling, multilateration, static hosting, and health reporting."
+    source_slice: {file: echolocate-server.js, lines: [1, 378]}

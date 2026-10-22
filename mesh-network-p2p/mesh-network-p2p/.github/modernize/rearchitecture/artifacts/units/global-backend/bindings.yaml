@@ -1,0 +1,21 @@
+unit: global-backend
+bindings:
+  - type: route-declaration
+    name: "Express REST routes"
+    source_loc: signaling-server.js:83
+    target: "signaling-server, cloud-server, api-server"
+    must_appear_in_target: true
+    notes: "Routes expose beacon, Lifeboat, sync, model, state, and status operations."
+  - type: listener
+    name: "Socket.IO connection and domain event listeners"
+    source_loc: signaling-server.js:255
+    target: "Socket.IO Server"
+    must_appear_in_target: true
+    notes: "WebRTC signaling, cloud updates, and EchoLocate rounds use event protocols."
+runtime_config:
+  - key: PORT
+    source_loc: signaling-server.js:290
+    source: env
+    default_value: "4001"
+    must_appear_in_target: true
+    notes: "Each service uses PORT with a service-specific default."

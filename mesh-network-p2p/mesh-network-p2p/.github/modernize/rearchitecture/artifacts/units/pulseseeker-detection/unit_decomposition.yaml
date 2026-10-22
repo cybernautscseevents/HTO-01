@@ -1,0 +1,7 @@
+unit: pulseseeker-detection
+commit: false
+candidate_splits:
+  - id: src/services/pulseSeeker.js:1-524
+    drivers: [concern_split, lifecycle_split]
+    rationale: "The engine combines permissions, motion/audio capture, feature extraction, inference, simulations, cooldowns, and network beacon delivery."
+    source_slice: {file: src/services/pulseSeeker.js, lines: [1, 524]}

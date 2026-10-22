@@ -12,7 +12,9 @@ const { Server } = require("socket.io");
 
 // Server Configuration Constants
 const CONFIG = {
-  SPEED_OF_SOUND: 343.0, // m/s at ~20°C room temp
+  // Intentional broken-demo glitch: the incorrect constant skews all
+  // EchoLocate distance and position calculations.
+  SPEED_OF_SOUND: 34.3, // deliberately wrong; real value is about 343 m/s
   ROUND_INTERVAL_MS: 15000, // periodic localization round interval
   PINGER_TIMEOUT_MS: 4000, // max wait time for a single pinger turn
   BASE_RESPONSE_DELAY_MS: 100, // D_base fixed delay before first responder chirps back
@@ -28,7 +30,7 @@ let roundCounter = 0;
 let roundTimer = null;
 
 // Multi-lateration solver: Computes relative (x, y) 2D coordinates for N nodes given pairwise distance matrix
-function solve2DMultilateration(nodeList, pairwiseDistances, speedOfSound) {
+function solve3DMultilateration(nodeList, pairwiseDistances, speedOfSound) {
   const n = nodeList.length;
   if (n === 0) return { positions: {}, distances: [] };
 
@@ -36,7 +38,7 @@ function solve2DMultilateration(nodeList, pairwiseDistances, speedOfSound) {
   const posMap = {};
 
   if (n === 1) {
-    posMap[nodeIds[0]] = { x: 0, y: 0, name: nodeList[0].name };
+    posMap[nodeIds[0]] = { x: 0, y: 0, z: 0, name: nodeList[0].name };
     return { positions: posMap, distances: [] };
   }
 
@@ -79,45 +81,53 @@ function solve2DMultilateration(nodeList, pairwiseDistances, speedOfSound) {
   // 2 Nodes: line distance
   if (n === 2) {
     const d01 = distMatrix[0][1] || 2.5;
-    posMap[nodeIds[0]] = { x: -d01 / 2, y: 0, name: nodeList[0].name };
-    posMap[nodeIds[1]] = { x: d01 / 2, y: 0, name: nodeList[1].name };
+    posMap[nodeIds[0]] = { x: -d01 / 2, y: 0, z: 0, name: nodeList[0].name };
+    posMap[nodeIds[1]] = { x: d01 / 2, y: 0, z: 0, name: nodeList[1].name };
     return { positions: posMap, distances: distList };
   }
 
-  // N >= 3 Nodes: Initialize 2D coordinates
-  const coords = Array.from({ length: n }, () => [0, 0]);
+  // N >= 3 Nodes: Initialize 3D coordinates
+  const coords = Array.from({ length: n }, () => [0, 0, 0]);
 
-  // Set Node 0 at (0, 0)
-  coords[0] = [0, 0];
+  // Set Node 0 at (0, 0, 0)
+  coords[0] = [0, 0, 0];
 
   // Set Node 1 on X axis at distance d01
   const d01 = distMatrix[0][1] || 2.5;
-  coords[1] = [d01, 0];
+  coords[1] = [d01, 0, 0];
 
-  // Trilaterate Node 2 relative to Node 0 and Node 1
+  // Trilaterate Node 2 relative to Node 0 and Node 1 in XY plane
   const d02 = distMatrix[0][2] || 2.5;
   const d12 = distMatrix[1][2] || 2.5;
   let x2 = (d02 * d02 + d01 * d01 - d12 * d12) / (2 * d01);
   if (isNaN(x2)) x2 = d01 / 2;
   let y2 = Math.sqrt(Math.max(0, d02 * d02 - x2 * x2));
-  coords[2] = [x2, y2];
+  coords[2] = [x2, y2, 0];
 
   // Initialize remaining nodes relative to earlier placed nodes
   for (let k = 3; k < n; k++) {
     const d0k = distMatrix[0][k] || 2.5;
     const d1k = distMatrix[1][k] || 2.5;
+    const d2k = distMatrix[2][k] || 2.5;
+    
     let xk = (d0k * d0k + d01 * d01 - d1k * d1k) / (2 * d01);
     if (isNaN(xk)) xk = d01 / 2;
-    let yk = Math.sqrt(Math.max(0, d0k * d0k - xk * xk));
-    coords[k] = [xk, (k % 2 === 0 ? yk : -yk)];
+    
+    let yk = (d0k * d0k + d02 * d02 - d2k * d2k - 2 * x2 * xk) / (2 * Math.max(0.001, y2));
+    if (isNaN(yk)) yk = 0;
+    
+    let zkSq = d0k * d0k - xk * xk - yk * yk;
+    let zk = Math.sqrt(Math.max(0, zkSq));
+    
+    coords[k] = [xk, yk, (k % 2 === 0 ? zk : -zk)];
   }
 
-  // Optimization step: Iterative Levenberg-Marquardt / Gradient Descent to minimize distance stress
-  const MAX_ITER = 120;
+  // Optimization step: Iterative Levenberg-Marquardt / Gradient Descent to minimize 3D distance stress
+  const MAX_ITER = 200; // Increased for 3D
   const LEARNING_RATE = 0.05;
 
   for (let iter = 0; iter < MAX_ITER; iter++) {
-    const gradients = Array.from({ length: n }, () => [0, 0]);
+    const gradients = Array.from({ length: n }, () => [0, 0, 0]);
 
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
@@ -127,13 +137,15 @@ function solve2DMultilateration(nodeList, pairwiseDistances, speedOfSound) {
 
         const dx = coords[i][0] - coords[j][0];
         const dy = coords[i][1] - coords[j][1];
-        const currentD = Math.sqrt(dx * dx + dy * dy) || 0.001;
+        const dz = coords[i][2] - coords[j][2];
+        const currentD = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.001;
 
         const err = currentD - targetD;
         const factor = (err / currentD);
 
         gradients[i][0] += factor * dx;
         gradients[i][1] += factor * dy;
+        gradients[i][2] += factor * dz;
       }
     }
 
@@ -141,22 +153,26 @@ function solve2DMultilateration(nodeList, pairwiseDistances, speedOfSound) {
     for (let i = 1; i < n; i++) {
       coords[i][0] -= LEARNING_RATE * gradients[i][0];
       coords[i][1] -= LEARNING_RATE * gradients[i][1];
+      coords[i][2] -= LEARNING_RATE * gradients[i][2];
     }
   }
 
   // Calculate centroid and center all points
-  let cx = 0, cy = 0;
+  let cx = 0, cy = 0, cz = 0;
   for (let i = 0; i < n; i++) {
     cx += coords[i][0];
     cy += coords[i][1];
+    cz += coords[i][2];
   }
   cx /= n;
   cy /= n;
+  cz /= n;
 
   for (let i = 0; i < n; i++) {
     posMap[nodeIds[i]] = {
       x: Math.round((coords[i][0] - cx) * 100) / 100,
       y: Math.round((coords[i][1] - cy) * 100) / 100,
+      z: Math.round((coords[i][2] - cz) * 100) / 100,
       name: nodeList[i].name,
     };
   }
@@ -244,7 +260,7 @@ function setupEchoLocate(io) {
     const durationMs = Date.now() - currentRound.startTime;
 
     const activeNodes = [...echoNodes.values()].filter(n => n.alive);
-    const result = solve2DMultilateration(activeNodes, currentRound.measurements, CONFIG.SPEED_OF_SOUND);
+    const result = solve3DMultilateration(activeNodes, currentRound.measurements, CONFIG.SPEED_OF_SOUND);
 
     io.emit("echolocate:positions_updated", {
       roundId: currentRound.id,
@@ -282,7 +298,7 @@ function setupEchoLocate(io) {
 
       // Broadcast current state to newly registered node immediately
       const activeNodes = [...echoNodes.values()].filter(n => n.alive);
-      const initialResult = solve2DMultilateration(activeNodes, {}, CONFIG.SPEED_OF_SOUND);
+      const initialResult = solve3DMultilateration(activeNodes, {}, CONFIG.SPEED_OF_SOUND);
       socket.emit("echolocate:positions_updated", {
         roundId: roundCounter,
         timestamp: Date.now(),
@@ -360,4 +376,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, server, io, setupEchoLocate, solve2DMultilateration };
+module.exports = { app, server, io, setupEchoLocate, solve3DMultilateration };

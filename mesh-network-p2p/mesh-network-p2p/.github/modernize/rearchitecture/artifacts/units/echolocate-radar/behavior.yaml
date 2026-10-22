@@ -1,0 +1,26 @@
+unit: echolocate-radar
+side_effects:
+  - source_loc: src/services/echoLocate.js:182
+    effect: "Registers the browser node and responds to pinger turns with audio measurements."
+    must_preserve: true
+  - source_loc: src/components/EchoLocatePanel.jsx:69
+    effect: "Renders continuously updated relative positions on a canvas."
+    must_preserve: true
+branches:
+  - source_loc: src/services/echoLocate.js:124
+    condition: "Audio context or microphone permission is unavailable"
+    behavior: "Reports an explicit audio/microphone error."
+    must_preserve: true
+error_paths:
+  - source_loc: src/services/echoLocate.js:135
+    trigger: "Insecure context or getUserMedia failure"
+    outcome: "Stops microphone startup and reports mic error status."
+    contract: "Status callback with micActive false"
+    must_preserve: true
+concurrency:
+  model: event-loop
+  tx_boundary:
+    source_loc: src/services/echoLocate.js:161
+    scope: "Socket.IO round callbacks and AudioContext scheduling form the round lifecycle."
+    isolation: "none"
+    must_preserve: true

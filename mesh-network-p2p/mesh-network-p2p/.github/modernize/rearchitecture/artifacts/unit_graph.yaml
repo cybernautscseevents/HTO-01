@@ -1,0 +1,108 @@
+units:
+  - name: mesh-console
+    trigger: page
+    trigger_detail: "GET /"
+    source_anchors:
+      - path: src/pages/MeshConsole.jsx
+        line: 17
+    exported_signature:
+      - method: "ReactElement MeshConsole()"
+        source_loc: src/pages/MeshConsole.jsx:17
+        stability: must_preserve
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: global-backend
+        via: "Socket.IO signaling, /api, /sync, /model"
+    shared_refs:
+      - module: browser-session-identity
+        used_fields: [mesh_node_name, mesh_joined]
+
+  - name: echolocate-radar
+    trigger: page
+    trigger_detail: "GET /echolocate"
+    source_anchors:
+      - path: src/pages/EchoLocateView.jsx
+        line: 7
+    exported_signature:
+      - method: "ReactElement EchoLocateView()"
+        source_loc: src/pages/EchoLocateView.jsx:7
+        stability: must_preserve
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: global-backend
+        via: "Socket.IO EchoLocate events"
+    shared_refs:
+      - module: browser-session-identity
+        used_fields: [mesh_node_name, mesh_joined]
+
+  - name: pulseseeker-detection
+    trigger: page
+    trigger_detail: "GET /pulseseeker"
+    source_anchors:
+      - path: src/pages/PulseSeekerView.jsx
+        line: 8
+    exported_signature:
+      - method: "ReactElement PulseSeekerView()"
+        source_loc: src/pages/PulseSeekerView.jsx:8
+        stability: must_preserve
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: global-backend
+        via: "Socket.IO mesh and POST /api/auto-beacon"
+    shared_refs:
+      - module: browser-session-identity
+        used_fields: [mesh_node_name, mesh_joined]
+
+  - name: lifeboat-routing
+    trigger: page
+    trigger_detail: "GET /lifeboat"
+    source_anchors:
+      - path: src/pages/LifeboatView.jsx
+        line: 5
+    exported_signature:
+      - method: "ReactElement LifeboatView()"
+        source_loc: src/pages/LifeboatView.jsx:5
+        stability: must_preserve
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: global-backend
+        via: "POST /api/heartbeat and priority endpoints"
+    shared_refs:
+      - module: browser-session-identity
+        used_fields: [mesh_node_name, mesh_joined]
+
+  - name: cloud-dashboard
+    trigger: page
+    trigger_detail: "GET /dashboard or /dashboard.html"
+    source_anchors:
+      - path: src/pages/CloudDashboard.jsx
+        line: 4
+    exported_signature:
+      - method: "ReactElement CloudDashboard()"
+        source_loc: src/pages/CloudDashboard.jsx:4
+        stability: must_preserve
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: global-backend
+        via: "Socket.IO update/model_updated and /model"
+    shared_refs: []
+
+  - name: global-backend
+    trigger: api
+    trigger_detail: "Combined signaling-server.js plus auxiliary Node services"
+    source_anchors:
+      - path: signaling-server.js
+        line: 255
+      - path: cloud-server.js
+        line: 122
+      - path: echolocate-server.js
+        line: 284
+      - path: api-server.js
+        line: 31
+    exported_signature: []
+    dynamic_entrypoints: []
+    depends_on: []
+    shared_refs:
+      - module: lifeboat-domain
+        used_fields: [calculate, enqueue, dequeue, getStats]
+

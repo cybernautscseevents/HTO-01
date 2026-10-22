@@ -1,0 +1,7 @@
+unit: echolocate-radar
+commit: false
+candidate_splits:
+  - id: src/services/echoLocate.js:1-333
+    drivers: [concern_split, execution_model_split]
+    rationale: "The engine combines audio synthesis/correlation, microphone lifecycle, Socket.IO coordination, and measurement reporting."
+    source_slice: {file: src/services/echoLocate.js, lines: [1, 333]}

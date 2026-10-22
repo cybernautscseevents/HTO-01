@@ -1,5 +1,29 @@
-# 🌐 MeshGrid P2P & Disaster Rescue Suite (v3.0)
+# 🌐 ZoneSync P2P & Disaster Rescue Suite (v3.0)
 > **Serverless-Resilient P2P Mesh Network with On-Device AI, End-to-End Encryption, Acoustic Indoor Positioning (EchoLocate), Passive Victim Detection (PulseSeeker), and Lifeboat Priority Routing.**
+
+> **Project status:** This is the original full project transformed in place with the ZoneSync branding. The existing implementation, demos, and intentionally incomplete areas are preserved; this rename does not claim that every production integration is complete.
+
+The application is located in [`mesh-network-p2p/mesh-network-p2p`](./mesh-network-p2p/mesh-network-p2p). The product names used throughout the source, UI, server logs, metadata, and documentation are:
+
+- **ZoneSync** — the overall product and peer-to-peer rescue mesh.
+- **EchoLocate** — acoustic indoor positioning and 2D radar.
+- **PulseSeeker** — passive victim detection.
+- **Lifeboat** — lethality scoring and rescue-priority routing.
+
+### Intentional broken-backend demo state
+
+The frontend and project structure remain available, but selected backend
+integrations intentionally contain glitches for demonstration purposes:
+
+- PulseSeeker beacon broadcasts use an intentionally misspelled Socket.IO event,
+  so the REST request can succeed while connected clients miss the live alert.
+- Cloud model reads return a stale version after an update.
+- EchoLocate uses an intentionally incorrect speed-of-sound constant, producing
+  inaccurate distance and position results.
+
+These are deliberate demo defects, not production fixes. Restore the original
+event name, model response, and `343.0 m/s` constant before treating the backend
+as operational.
 
 ---
 
@@ -21,8 +45,8 @@ In disasters such as earthquakes, building collapses, floods, and severe grid fa
 1. **Infrastructure Blackout**: Cell towers lose power, fiber backbones sever, and internet access disappears.
 2. **Victim Silence**: Trapped, pinned, or unconscious victims cannot press SOS buttons, unlock phones, or speak.
 
-### What MeshGrid Does
-MeshGrid transforms standard smartphones, tablets, and laptops into a **self-healing, zero-install, decentralized rescue mesh**.
+### What ZoneSync Does
+ZoneSync transforms standard smartphones, tablets, and laptops into a **self-healing, zero-install, decentralized rescue mesh**.
 - Devices discover each other locally and form **serverless WebRTC data channels**.
 - Messages, voice notes, photos, and GPS coordinates route **hop-by-hop** across devices without requiring internet or cellular service.
 - If the signaling server dies after initial handshake, the **P2P mesh continues operating independently**.
@@ -89,7 +113,7 @@ MeshGrid transforms standard smartphones, tablets, and laptops into a **self-hea
 
 ```
                    +---------------------------------------+
-                   |       MeshGrid Node (Browser)         |
+                   |       ZoneSync Node (Browser)         |
                    |                                       |
                    |  +---------------------------------+  |
                    |  |      UI / Composer / Canvas     |  |
@@ -172,7 +196,7 @@ MeshGrid transforms standard smartphones, tablets, and laptops into a **self-hea
 
 ## 💻 5. Complete Command Reference
 
-Navigate to the project workspace directory `mesh-network-p2p/mesh-network-p2p`:
+From the repository root, navigate to the ZoneSync project directory:
 
 ```bash
 cd mesh-network-p2p/mesh-network-p2p
@@ -250,6 +274,6 @@ npm run build
 ## 💡 8. Limitations & Production Roadmap
 
 - **Acoustic Attenuation**: High-frequency acoustic chirps (17–19 kHz) attenuate through thick concrete walls. EchoLocate exposes configurable frequency ranges (e.g. 15–18 kHz) for real-device hardware tuning.
-- **Mobile HTTPS Sandbox**: Mobile browsers require HTTPS for microphone and motion sensors. MeshGrid includes built-in SSL support (`@vitejs/plugin-basic-ssl`) for seamless local Wi-Fi testing.
+- **Mobile HTTPS Sandbox**: Mobile browsers require HTTPS for microphone and motion sensors. ZoneSync includes built-in SSL support (`@vitejs/plugin-basic-ssl`) for seamless local Wi-Fi testing.
 - **Time-Division Interval**: Acoustic positioning uses discrete 15-second time-division rounds to avoid clock sync issues without requiring GPS time servers.
 - **PKI Fingerprint Roadmap**: Session keypairs are generated per browser session. Production deployments can pre-provision device fingerprints via QR-code pairing prior to field operations.

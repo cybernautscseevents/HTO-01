@@ -2,7 +2,7 @@
 
 > **Architecture, Component Hierarchy, Route Mapping, and UI Enhancement Guide**
 
-This document details the complete frontend layout, component structure, design system tokens, and page workflows for **MeshGrid P2P v3.0**. Use this guide to easily navigate, customize, and enhance the user interface.
+This document details the complete frontend layout, component structure, design system tokens, and page workflows for **ZoneSync P2P v3.0**. Use this guide to easily navigate, customize, and enhance the user interface.
 
 ---
 

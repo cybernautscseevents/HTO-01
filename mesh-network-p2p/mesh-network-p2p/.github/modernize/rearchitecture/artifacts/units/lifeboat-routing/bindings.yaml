@@ -1,0 +1,15 @@
+unit: lifeboat-routing
+bindings:
+  - type: route-declaration
+    name: "React Router path /lifeboat"
+    source_loc: src/App.jsx:16
+    target: LifeboatView
+    must_appear_in_target: true
+    notes: "Join-gated priority routing UI."
+  - type: route-declaration
+    name: "POST /api/heartbeat and priority routes"
+    source_loc: api-server.js:31
+    target: LethalityCalculator/LifeboatPriorityQueue
+    must_appear_in_target: true
+    notes: "HTTP contract consumed by LifeboatPanel."
+runtime_config: []

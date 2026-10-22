@@ -1,0 +1,33 @@
+unit: mesh-console
+side_effects:
+  - source_loc: src/pages/MeshConsole.jsx:156
+    effect: "Persists node name and joined status in localStorage/sessionStorage."
+    must_preserve: true
+  - source_loc: src/pages/MeshConsole.jsx:180
+    effect: "Creates MeshNode, registers with signaling, and updates topology/log/popups."
+    must_preserve: true
+  - source_loc: src/components/Composer.jsx:220
+    effect: "Sends text and media through the MeshNode transport."
+    must_preserve: true
+branches:
+  - source_loc: src/pages/MeshConsole.jsx:149
+    condition: "No non-empty node name"
+    behavior: "Join is ignored until a name is supplied."
+    must_preserve: true
+  - source_loc: src/pages/MeshConsole.jsx:86
+    condition: "Battery API reports a level change or simulated drain"
+    behavior: "Updates battery state and can trigger central-server failover."
+    must_preserve: true
+error_paths:
+  - source_loc: src/services/meshNode.js:112
+    trigger: "Secure context or Web Crypto initialization unavailable"
+    outcome: "Reports encryption unavailable and continues in cleartext mode."
+    contract: "User-visible crypto status/log"
+    must_preserve: true
+concurrency:
+  model: event-loop
+  tx_boundary:
+    source_loc: src/services/meshNode.js:47
+    scope: "No database transaction; message queues, timers, WebRTC callbacks, and Socket.IO events are coordinated in browser event-loop state."
+    isolation: "none"
+    must_preserve: true

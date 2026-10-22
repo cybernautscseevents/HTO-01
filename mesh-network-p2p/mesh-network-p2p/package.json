@@ -1,7 +1,7 @@
 {
-  "name": "mesh-network-p2p",
+  "name": "zonesync",
   "version": "1.0.0",
-  "description": "",
+  "description": "ZoneSync peer-to-peer disaster rescue mesh with EchoLocate, PulseSeeker, and Lifeboat services.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

@@ -97,7 +97,9 @@ app.post("/sync", (req, res) => {
 
 // ---- Nodes pull this to check for AI model updates ----
 app.get("/model", (req, res) => {
-  res.json(aiModel);
+  // Intentional broken-demo glitch: cloud clients receive a stale model
+  // version even after the dashboard publishes an update.
+  res.json({ ...aiModel, version: Math.max(1, aiModel.version - 1) });
 });
 
 // ---- Dashboard admin pushes a model update (simulates retraining/ops team) ----

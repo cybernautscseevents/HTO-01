@@ -1,0 +1,21 @@
+unit: echolocate-radar
+bindings:
+  - type: route-declaration
+    name: "React Router path /echolocate"
+    source_loc: src/App.jsx:14
+    target: EchoLocateView
+    must_appear_in_target: true
+    notes: "Join-gated acoustic radar page."
+  - type: listener
+    name: "echolocate:* Socket.IO events"
+    source_loc: src/services/echoLocate.js:161
+    target: EchoLocateEngine
+    must_appear_in_target: true
+    notes: "Round registration, pinger turns, and position updates."
+runtime_config:
+  - key: VITE_BACKEND_URL
+    source_loc: src/pages/EchoLocateView.jsx:8
+    source: env
+    default_value: "same-origin"
+    must_appear_in_target: true
+    notes: "Socket.IO endpoint."

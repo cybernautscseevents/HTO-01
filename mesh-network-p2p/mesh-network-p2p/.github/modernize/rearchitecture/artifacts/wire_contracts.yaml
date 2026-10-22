@@ -1,0 +1,65 @@
+contracts:
+  - name: mesh-signaling
+    unit: global-backend
+    type: sdk
+    stability: frozen
+    source_loc: signaling-server.js:255
+    contract:
+      method: "Socket.IO events"
+      path: "register, signal, server_failover, central_server_redirected"
+      request: "peer identity and WebRTC offer/answer/ICE data"
+      response: "registered suggestions and relayed signal packets"
+      error: "disconnect/error events"
+      auth: "none"
+    target_contract:
+      method: "Socket.IO-compatible event handlers"
+      notes: "Preserve event names and payload forwarding semantics."
+    semantic_divergence: []
+  - name: lifeboat-api
+    unit: global-backend
+    type: rest
+    stability: frozen
+    source_loc: signaling-server.js:112
+    contract:
+      method: "POST /api/heartbeat"
+      path: "/api/heartbeat"
+      request: "deviceId, sensors, location, message"
+      response: "score, priority, factors, recommendations, queue metadata"
+      error: "400 for missing deviceId; 500 for calculation failures"
+      auth: "none"
+    target_contract:
+      method: "POST /api/heartbeat -> JSON assessment and queue placement"
+      notes: "Preserve score thresholds, response fields, and queue side effects."
+    semantic_divergence: []
+  - name: cloud-sync
+    unit: global-backend
+    type: rest
+    stability: frozen
+    source_loc: cloud-server.js:82
+    contract:
+      method: "POST /sync"
+      path: "/sync"
+      request: "nodeId, name, topology, stats, recentEvents"
+      response: "ok and current aiModel"
+      error: "400 when nodeId is absent"
+      auth: "none"
+    target_contract:
+      method: "POST /sync -> {ok:true, aiModel}"
+      notes: "Also preserve Socket.IO update broadcasts."
+    semantic_divergence: []
+  - name: echolocate-events
+    unit: global-backend
+    type: sdk
+    stability: frozen
+    source_loc: echolocate-server.js:284
+    contract:
+      method: "Socket.IO events"
+      path: "echolocate:register, echolocate:pinger_turn, echolocate:report_measurements"
+      request: "node identity and round measurements"
+      response: "round_started and positions_updated"
+      error: "round timeout advances to the next pinger"
+      auth: "none"
+    target_contract:
+      method: "Socket.IO-compatible EchoLocate event protocol"
+      notes: "Preserve round timing, measurement keys, and positions payload."
+    semantic_divergence: []

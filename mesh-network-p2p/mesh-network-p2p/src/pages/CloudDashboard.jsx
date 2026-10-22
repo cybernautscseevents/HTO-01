@@ -58,7 +58,7 @@ export function CloudDashboard() {
       {/* Top Header Bar */}
       <div className="topbar">
         <div className="brand">
-          <div className="mark" style={{ fontSize: 12, letterSpacing: "0.14em", marginBottom: 6 }}>CRISISLINK // COMMAND CENTER</div>
+          <div className="mark" style={{ fontSize: 12, letterSpacing: "0.14em", marginBottom: 6 }}>ZONESYNC // COMMAND CENTER</div>
           <h1 style={{ fontSize: 26, fontWeight: 800, margin: "2px 0 6px" }}>Cloud Monitoring & AI Operations</h1>
           <p style={{ fontSize: 14, color: "var(--muted)" }}>Remote telemetry aggregator + hot model distribution engine</p>
         </div>

@@ -1,0 +1,7 @@
+unit: cloud-dashboard
+commit: false
+candidate_splits:
+  - id: src/pages/CloudDashboard.jsx:4-243
+    drivers: [concern_split, nfr_split]
+    rationale: "The page combines live node monitoring, event timeline rendering, and administrative AI model deployment."
+    source_slice: {file: src/pages/CloudDashboard.jsx, lines: [4, 243]}

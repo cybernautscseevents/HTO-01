@@ -1,0 +1,21 @@
+unit: mesh-console
+bindings:
+  - type: route-declaration
+    name: "React Router path /"
+    source_loc: src/App.jsx:13
+    target: MeshConsole
+    must_appear_in_target: true
+    notes: "Root route renders the primary console."
+  - type: listener
+    name: "Socket.IO signaling connection"
+    source_loc: src/pages/MeshConsole.jsx:18
+    target: MeshNode
+    must_appear_in_target: true
+    notes: "WebRTC bootstrap and mesh events use this socket."
+runtime_config:
+  - key: VITE_BACKEND_URL
+    source_loc: src/pages/MeshConsole.jsx:18
+    source: env
+    default_value: "same-origin"
+    must_appear_in_target: true
+    notes: "Controls Socket.IO/backend base URL."
